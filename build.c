@@ -237,5 +237,6 @@ int main(int argc, char** argv) {
         printf("\033[32m Finished\033[0m total in %lu ms\n", (stop.tv_nsec-start.tv_nsec)/1000000);
     }
 
+    destroy_pages();
     return result;
 }
