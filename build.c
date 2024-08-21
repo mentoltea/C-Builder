@@ -83,10 +83,10 @@ void print_info_about() {
 }
 
 bool spec_recompile(cpp_file* file) {
-    char buff[256];
+    char buff[128];
     if (file->target) sprintf(buff, "%s %s %s%s%s -o %s%s", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->target);
     else sprintf(buff, "%s %s %s%s%s -o %s%s.o", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->name);
-    
+    // printf("LEN: %d", strlen(buff));
     return cmd_exec(buff);
 }
 
@@ -100,7 +100,7 @@ bool recompile(bool force) {
     printf("Compilation:\n");
     vector_metainfo meta = vec_meta(cpp_source);
     cpp_file *file;
-    char buff[256];
+    char buff[64];
     time_t t1, t2;
     struct timespec start, stop;
     // printf("%d", meta.length);
@@ -149,7 +149,7 @@ bool recompile(bool force) {
 bool build(bool force) {
     if (!recompile(force)) return error("Compilation error\n");
     
-    char buff[512]; *buff = '\0';
+    char buff[256]; *buff = '\0';
     int written = 0;
     sprintf(buff+written, "%s ", linker);
     written = strlen(buff);
@@ -173,6 +173,7 @@ bool build(bool force) {
     printf("Linking:\n");
     struct timespec start, stop;
     clock_gettime(CLOCK_REALTIME, &start);
+    // printf("FIN LEN: %d\n", strlen(buff));
     bool result = cmd_exec(buff);
     if (result) {
         clock_gettime(CLOCK_REALTIME, &stop);
