@@ -13,9 +13,19 @@
 
 #include "json.h"
 
+typedef struct cpp_file {
+    char* compiler;
+    char* name;
+    char* format;
+    char* cflags;
+    char* target;
+    char** dependencies; // vector
+} cpp_file;
+
+
 json_child handler;
-char *indir, *outdir, *compiler, *format, *libs, *cflags, *target;
-char** cpp_source; // vectors
+char *indir, *outdir, *compiler, *linker, *format, *libs, *cflags, *target;
+cpp_file* cpp_source; // vectors
 
 struct stat _lasttime;
 time_t lastUpdateTime(const char* filename) {
@@ -50,7 +60,8 @@ bool dir_exists(const char* path) {
 }
 
 bool cmd_exec(const char* command) {
-    // printf(command);
+    // printf("\t\t%s\n", command);
+    // return 1;
     int result = system(command);
     return result==0;
 }
@@ -71,9 +82,11 @@ void print_info_about() {
     "-fr \t forcefully recompiles to obj files, even if already exists\n--force_recompile\n\n");
 }
 
-bool spec_recompile(char* filename) {
+bool spec_recompile(cpp_file* file) {
     char buff[256];
-    sprintf(buff, "%s %s %s%s%s -c -o %s%s.o", compiler, cflags, indir, filename, format, outdir, filename);
+    if (file->target) sprintf(buff, "%s %s %s%s%s -o %s%s", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->target);
+    else sprintf(buff, "%s %s %s%s%s -o %s%s.o", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->name);
+    
     return cmd_exec(buff);
 }
 
@@ -85,32 +98,49 @@ bool recompile(bool force) {
         mkdir(outdir);
     }
     printf("Compilation:\n");
-    vector_metainfo meta;
-    meta = vec_meta(cpp_source);
+    vector_metainfo meta = vec_meta(cpp_source);
+    cpp_file *file;
     char buff[256];
     time_t t1, t2;
     struct timespec start, stop;
     // printf("%d", meta.length);
     for (int i=0; i<meta.length; i++) {
-        sprintf(buff, "%s%s.o", outdir, cpp_source[i]);
-        if (file_exists(buff)) {
-            t1 = lastUpdateTime(buff);
-            // printf(buff);
-            sprintf(buff, "%s%s%s", indir, cpp_source[i], format);
-            t2 = lastUpdateTime(buff);
-            // printf(buff);
-            if (t1 >= t2) {
-                if (!force) continue;
+        file = cpp_source+i;
+        
+        if (file->target) sprintf(buff, "%s%s", outdir, file->target);
+        else sprintf(buff, "%s%s.o", outdir, file->name);
+
+        if (!force) {    
+            if (file_exists(buff)) {
+                t1 = lastUpdateTime(buff);
+                sprintf(buff, "%s%s%s", indir, file->name, file->format);
+                t2 = lastUpdateTime(buff);
+                if (t1 >= t2) {
+                    bool flag = true;
+                    if (file->dependencies) {
+                        vector_metainfo dep_mt = vec_meta(file->dependencies);
+                        for (int j=0; j<dep_mt.length; j++) {
+                            t2 = lastUpdateTime(file->dependencies[j]);
+                            if (t2 > t1) {
+                                printf("\tNoticed change in dependence \033[34m%s\033[0m\n", file->dependencies[j]);
+                                flag=false; 
+                                break;
+                            }
+                        }
+                    }
+                    if (flag) continue;
+                }
             }
         }
-        
-        clock_gettime(CLOCK_MONOTONIC, &start);
-        if (!spec_recompile(cpp_source[i])) {
-            sprintf(buff, "Cannot compile file %s%s\n", cpp_source[i], format);
+
+        clock_gettime(CLOCK_REALTIME, &start);
+        if (!spec_recompile(file)) {
+            sprintf(buff, "\tCannot compile file %s%s%s\n", indir, file->name, file->format);
             return error(buff);
         }
-        clock_gettime(CLOCK_MONOTONIC, &stop);
-        printf("\t\033[34m %s%s:\033[0m\t %lu ms\n", cpp_source[i], format, (stop.tv_nsec-start.tv_nsec)/1000000);
+        clock_gettime(CLOCK_REALTIME, &stop);
+
+        printf("\t\033[34m %s%s:\033[0m\t %ld ms\n", file->name, file->format, abs((stop.tv_nsec-start.tv_nsec)/1000000));
     }
 
     return true;
@@ -121,27 +151,32 @@ bool build(bool force) {
     
     char buff[512]; *buff = '\0';
     int written = 0;
-    sprintf(buff+written, "%s ", compiler);
+    sprintf(buff+written, "%s ", linker);
     written = strlen(buff);
     vector_metainfo meta = vec_meta(cpp_source);
+    cpp_file *file;
     
     for (int i=0; i<meta.length; i++) {
-        sprintf(buff+written, "%s%s.o ", outdir, cpp_source[i]);
+        file = cpp_source + i;
+        if (file->target) sprintf(buff+written, "%s%s ", outdir, file->target);
+        else sprintf(buff+written, "%s%s.o ", outdir, file->name);
         written = strlen(buff);
     }
 
-    sprintf(buff+written, libs);
-    written = strlen(buff);
+    if (libs) {
+        sprintf(buff+written, libs);
+        written = strlen(buff);
+    }
 
     sprintf(buff+written, " -o %s%s", outdir, target);
     
     printf("Linking:\n");
     struct timespec start, stop;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    clock_gettime(CLOCK_REALTIME, &start);
     bool result = cmd_exec(buff);
     if (result) {
-        clock_gettime(CLOCK_MONOTONIC, &stop);
-        printf("\t%lu ms\n", (stop.tv_nsec-start.tv_nsec)/1000000);
+        clock_gettime(CLOCK_REALTIME, &stop);
+        printf("\t%ld ms\n", abs((stop.tv_nsec-start.tv_nsec)/1000000));
     }
     return result;
 }
@@ -162,7 +197,7 @@ bool load_build_data() {
     cflags = NULL; 
     target = NULL;
     cpp_source = NULL;
-    
+
     vector_metainfo mt;
     for (int i=0; i<meta.length; i++) {
         temp = handler.fields[i];
@@ -175,6 +210,8 @@ bool load_build_data() {
             outdir = obj.data.str;
         } else if (strcmp(temp.key, "compiler")==0) {
             compiler = obj.data.str;
+        } else if (strcmp(temp.key, "linker")==0) {
+            linker = obj.data.str;
         } else if (strcmp(temp.key, "format")==0) {
             format = obj.data.str;
         } else if (strcmp(temp.key, "cflags")==0) {
@@ -183,15 +220,65 @@ bool load_build_data() {
             libs = obj.data.str;
         } else if (strcmp(temp.key, "cpp_source")==0) {
             mt = vec_meta(obj.data.array);
-            cpp_source = new_vec(sizeof(char*), mt.length);
+            cpp_source = new_vec(sizeof(cpp_file), mt.length);
             for (int j=0; j<mt.length; j++) {
-                cpp_source = vec_add(cpp_source, &(obj.data.array[j].data.str));
-                // printf("%s\n", cpp_source[j]);
+                cpp_file file = {0};
+                json_object inner = obj.data.array[j];
+                if (inner.type == CHILD) {
+                    vector_metainfo fields_inner = vec_meta(inner.data.child.fields);
+                    for (int m = 0; m < fields_inner.length; m++) {
+                        json_pair inn_pair = inner.data.child.fields[m];
+                        json_object inobj = inn_pair.value;
+                        if (strcmp(inn_pair.key, "target")==0) {
+                            file.target = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "format")==0) {
+                            file.format = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "name")==0) {
+                            file.name = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "compiler")==0) {
+                            file.compiler = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "cflags")==0) {
+                            file.cflags = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "dependencies")==0) {
+                            vector_metainfo dep_mt = vec_meta(inobj.data.array);
+                            file.dependencies = new_vec(sizeof(char*), dep_mt.length);
+                            for (int d=0; d < dep_mt.length; d++) {
+                                file.dependencies = vec_add(file.dependencies, &(inobj.data.array[d].data.str));
+                            }
+                        }
+                    }
+                } else if (inner.type == STR) {
+                    file.name = inner.data.str;
+                } else {
+                    return error("Inapropriate type of cpp source file\n");
+                }
+
+                
+                if (!file.name) {
+                    return error("File name is not provided\n");
+                }
+                if (!file.cflags) 
+                    if (cflags && strlen(cflags)>0) file.cflags = cflags;
+                    else file.cflags = "-c";
+                if (!file.compiler) file.compiler = compiler;
+                if (!file.format) file.format = format;
+
+                cpp_source = vec_add(cpp_source, &file);
+
+                // printf("%s %s %s %s %s\n", file.name, file.format, file.compiler,  file.target, file.cflags);
+                // if (file.dependencies) {
+                //     vector_metainfo dep_mt = vec_meta(file.dependencies);
+                //     for (int d=0; d < dep_mt.length; d++) {
+                //         printf("%s ", file.dependencies[d]);
+                //     }
+                //     printf("\n");
+                // }
             }
+
         }
     }
     // printf("%s %s %s %s %s %s %s\n", indir, outdir, compiler, format, libs, cflags, target);
-    return indir && outdir && compiler && format && libs && cflags && target && cpp_source;
+    return indir && outdir && compiler && format && target && cpp_source;
 }
 
 
@@ -203,10 +290,10 @@ int main(int argc, char** argv) {
         printf("\033[31;1m Cannot read json-file \033[0m\n");
         return 1;
     }
-
+    
     bool result = true;
     struct timespec start, stop;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    clock_gettime(CLOCK_REALTIME, &start);
     if (argc > 1) {
         if (in_vector("--help", argv, argc)) {
             print_info_about();
@@ -229,12 +316,12 @@ int main(int argc, char** argv) {
         result = build(false);
         //print_info_about();
     }
-    clock_gettime(CLOCK_MONOTONIC, &stop);
+    clock_gettime(CLOCK_REALTIME, &stop);
     
     if (!result) {
         printf("\033[31;1m Error occurred \033[0m\n");
     } else {
-        printf("\033[32m Finished\033[0m total in %lu ms\n", (stop.tv_nsec-start.tv_nsec)/1000000);
+        printf("\033[32m Finished\033[0m total in %ld ms\n", abs((stop.tv_nsec-start.tv_nsec)/1000000));
     }
 
     destroy_pages();

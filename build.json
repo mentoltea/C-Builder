@@ -1,0 +1,34 @@
+{
+    "compiler" : "gcc",
+    "linker" : "gcc",
+    "format" : ".c",   
+    "indir" : "./",
+    "outdir" : "bin/",
+    "target" : "build.exe",
+    "cflags" : "-c",
+    "cpp_source" : [
+        "build",
+        {
+            "name" : "json",
+            "format" : ".c",
+            "dependencies" : [
+                "json.h"
+            ]
+        } ,
+        {
+            "name" : "vector",
+            "compiler" : "gcc",
+            "format" : ".c",
+            "dependencies" : [
+                "vector.h"
+            ]
+        } ,
+        {
+            "name" : "memmanager",
+            "format" : ".c",
+            "dependencies" : [
+                "memmanager.h"
+            ]
+        }
+    ]
+}
