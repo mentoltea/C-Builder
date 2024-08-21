@@ -46,6 +46,7 @@ bool file_exists (const char* name) {
 
 bool error(const char* message) {
     fprintf(stdout, message);
+    fprintf(stderr, message);
     destroy_pages();
     return false;
 }
@@ -285,32 +286,35 @@ bool load_build_data() {
 
 
 int main(int argc, char** argv) {
+    printf("\033[36;1m C-Builder by s7k \n\033[0m");
     init_json();
+    // printf("\033[36m JSON inited \n\033[0m");
     system("");
     if (!load_build_data()) {
         printf("\033[31;1m Cannot read json-file \033[0m\n");
         return 1;
     }
-    
+    printf("\033[36m JSON-file succesfully read \n\033[0m");
     bool result = true;
     struct timespec start, stop;
-    clock_gettime(CLOCK_REALTIME, &start);
+    
     if (argc > 1) {
         if (in_vector("--help", argv, argc)) {
             print_info_about();
-            return 0;
-        }
-
-        if (in_vector("-fb", argv, argc) || in_vector("-bf", argv, argc) || in_vector("--force_build", argv, argc)) {
+        } else if (in_vector("-fb", argv, argc) || in_vector("-bf", argv, argc) || in_vector("--force_build", argv, argc)) {
+            clock_gettime(CLOCK_REALTIME, &start);
             result = build(true);
         }
         else if (in_vector("-fr", argv, argc) || in_vector("-rf", argv, argc) || in_vector("--force_recompile", argv, argc)) {
+            clock_gettime(CLOCK_REALTIME, &start);
             result = recompile(true);
         }
         else if (in_vector("-b", argv, argc) || in_vector("--build", argv, argc)) {
+            clock_gettime(CLOCK_REALTIME, &start);
             result = build(false);
         }
         else if (in_vector("-r", argv, argc) || in_vector("--recompile", argv, argc)) {
+            clock_gettime(CLOCK_REALTIME, &start);
             result = recompile(false);
         }
     } else {
@@ -319,12 +323,14 @@ int main(int argc, char** argv) {
     }
     clock_gettime(CLOCK_REALTIME, &stop);
     
+    destroy_pages();
+    // printf("\033[36m Pages deallocated \n\033[0m");
+
     if (!result) {
         printf("\033[31;1m Error occurred \033[0m\n");
     } else {
         printf("\033[32m Finished\033[0m total in %ld ms\n", abs((stop.tv_nsec-start.tv_nsec)/1000000));
     }
 
-    destroy_pages();
     return result;
 }
