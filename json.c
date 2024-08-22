@@ -71,18 +71,25 @@ Token* split_into_pairs(char *str, size_t size, int array) {
     
     Token* vec = new_vec(sizeof(Token), 10);
     Token temp;
-    for (ptr = str+1; ptr != end; ptr++) {
+
+    // printf("%s|\n\n", string_from_ptrs(str, end));
+    // printf("|%c %c|\n", *str, *end);
+    for (ptr = str+1; ptr < end; ptr++) {
         if (*ptr == ',') {
             ptr++;
         }
-        if (*ptr == symsymb || *ptr == stopsymb || *ptr=='\n' || *ptr=='\t') {
+        if (*ptr=='\n' || *ptr=='\t') {
             continue;
         }
+
         start = ptr;
         ptr = strchr(ptr, ',');
-        if (!ptr) ptr = end-1;
+        if (!ptr) ptr = end;
 
+        if (*ptr == '\0') ptr--;
+        // if (ptr==end) ptr--;
         temp.start = start; temp.end = ptr; temp.parent = NULL;
+        // printf("<%c %c>\n", *start, *ptr);
         vec = vec_add(vec, &temp);
     }
     vector_metainfo *meta = vec_metaptr(vec);
@@ -90,6 +97,7 @@ Token* split_into_pairs(char *str, size_t size, int array) {
     
     for (int i=0; i<meta->length; i++) {
         temp = vec[i];
+        // printf("%s\n\n", string_from_ptrs(temp.start, temp.end));
         if (count_of(temp.start, temp.end, '"')%2 == 1) {
             if (i!=meta->length-1) {
                 vec[i+1].start = temp.start;
@@ -105,6 +113,7 @@ Token* split_into_pairs(char *str, size_t size, int array) {
                 continue;
             }
             printf("Syntax error with []\n");
+            // printf("%s\n", string_from_ptrs(vec[i-1].start, vec[i-1].end));
             printf("%s\n", string_from_ptrs(temp.start, temp.end));
             exit_on_error(1);
         } 
@@ -140,7 +149,7 @@ json_pair parse_pair(Token *tk) {
         key[keysize-1] = '\0';
     }
     pair.key = key;
-    // printf(key);
+    // printf("%s\n", value);
     //printf("SIZE OF %s %d\n", value, strlen(value));
     pair.value = read_object(value, strlen(value)+1);
     memfree(value);
@@ -175,15 +184,16 @@ json_object_types object_type(char* value, size_t size) {
 }
 
 json_object read_object(char* value, size_t size) {
+    // printf("%s\n", value);
     json_object_types type = object_type(value, size);
     json_object obj; obj.type = type;
     // json_child *child;
     switch (type) {
         case STR:
-            obj.data.str = string_from_ptrs(value+1, value+size-2);
+            obj.data.str = string_from_ptrs(value+1, value+size-1);
             int s = strlen(obj.data.str);
             if (obj.data.str[s-1]=='"') obj.data.str[s-1]='\0';
-            // printf("str | %s\n", obj.data.str);
+            printf("%s | %s\n", value, obj.data.str);
             break;
         case INT:
             obj.data.num = strtol(value, NULL, 0);
@@ -211,6 +221,7 @@ json_object read_object(char* value, size_t size) {
 
 // @return vector of objects
 json_object *read_array(char *value, size_t size) {
+    // printf("%s\n\n", string_from_ptrs(value, value+size));
     Token* pairs = split_into_pairs(value, size, 1); // vector
     vector_metainfo meta = vec_meta(pairs);
     json_object *array = new_vec(sizeof(json_object), meta.length);
@@ -228,7 +239,7 @@ json_object *read_array(char *value, size_t size) {
 }
 
 json_child read_child(char *str, size_t size) {
-    Token* pairs = split_into_pairs(str, size, 0); // vector
+    Token* pairs = split_into_pairs(str, size+1, 0); // vector
     vector_metainfo meta = vec_meta(pairs);
     json_child child;
     child.fields = new_vec(sizeof(json_pair), meta.length);
