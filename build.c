@@ -67,6 +67,21 @@ bool cmd_exec(const char* command) {
     return result==0;
 }
 
+bool makedir(const char* filename) {
+#if defined(WIN32)
+    // printf("Windows\n");
+    return mkdir(filename)==0;
+#elif defined(__linux__)||defined(__unix__)
+    // printf("Linux\n");
+    return mkdir(filename, S_IFDIR)==0;
+#else
+    printf("\033[33;1mNot found system. Using terminal mkdir to create directory\033[0m\n");
+    char buff[64];
+    sprintf(buff, "mkdir %s", filename);
+    return cmd_exec(buff);
+#endif
+}
+
 bool in_vector(char* string, char** vector, size_t size) {
     for (int i=0; i<size; i++) {
         if (strcmp(string, vector[i])==0) {
@@ -96,7 +111,9 @@ bool recompile(bool force) {
 
     
     if (!dir_exists(outdir)) {
-        mkdir(outdir);
+        if (!makedir(outdir)) {
+            return error("Cannot create output directory\n");
+        }
     }
     printf("Compilation:\n");
     vector_metainfo meta = vec_meta(cpp_source);

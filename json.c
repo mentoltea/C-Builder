@@ -193,7 +193,7 @@ json_object read_object(char* value, size_t size) {
             obj.data.str = string_from_ptrs(value+1, value+size-1);
             int s = strlen(obj.data.str);
             if (obj.data.str[s-1]=='"') obj.data.str[s-1]='\0';
-            printf("%s | %s\n", value, obj.data.str);
+            // printf("%s | %s\n", value, obj.data.str);
             break;
         case INT:
             obj.data.num = strtol(value, NULL, 0);
