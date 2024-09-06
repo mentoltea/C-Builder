@@ -14,6 +14,7 @@
 #include "json.h"
 
 typedef struct cpp_file {
+    bool linkable;
     char* compiler;
     char* name;
     char* format;
@@ -21,7 +22,6 @@ typedef struct cpp_file {
     char* libs;
     char* target;
     char** dependencies; // vector
-    bool linkable;
 } cpp_file;
 
 
@@ -62,16 +62,13 @@ bool dir_exists(const char* path) {
     return false;
 }
 
-size_t cursor_print(char* stream, char* format, ...) {
-    sprintf(stream, format);
-    return strlen(stream);
-}
+
 
 bool cmd_exec(const char* command) {
-    printf("\t\t%s\n", command);
-    return 1;
-    // int result = system(command);
-    // return result==0;
+    // printf("%s\n", command);
+    // return 1;
+    int result = system(command);
+    return result==0;
 }
 
 bool makedir(const char* filename) {
@@ -106,13 +103,19 @@ void print_info_about() {
 }
 
 bool spec_recompile(cpp_file* file) {
-    char buff[128];
+    char buff[256];
     size_t cursor = 0;
-    cursor += cursor_print(buff+cursor, "%s %s %s%s%s ", file->compiler, file->cflags, indir, file->name, file->format);
-    if (file->libs) cursor += cursor_print(buff+cursor, "%s ", file->libs);
+    sprintf(buff+cursor, "%s %s %s%s%s ", file->compiler, file->cflags, indir, file->name, file->format);
+    cursor = strlen(buff);
 
-    if (file->target) cursor_print(buff+cursor, "-o %s%s ", outdir, file->target);
-    else cursor_print(buff+cursor, "-o %s%s.o ", outdir, file->name);
+    if (file->libs) {
+        sprintf(buff+cursor, "%s ", file->libs);
+        cursor = strlen(buff);
+    }
+
+    if (file->target) sprintf(buff+cursor, "-o %s%s ", outdir, file->target);
+    else sprintf(buff+cursor, "-o %s%s.o ", outdir, file->name);
+    cursor = strlen(buff);
 
     return cmd_exec(buff);
 }
@@ -126,7 +129,7 @@ bool recompile(bool force) {
             return error("Cannot create output directory\n");
         }
     }
-    printf("Compilation:\n");
+    printf("\033[33mCompilation:\033[0m\n");
     vector_metainfo meta = vec_meta(cpp_source);
     cpp_file *file;
     char buff[64];
@@ -169,7 +172,10 @@ bool recompile(bool force) {
         }
         clock_gettime(CLOCK_REALTIME, &stop);
 
-        printf("\t\033[34m %s%s:\033[0m\t %ld ms\n", file->name, file->format, abs((stop.tv_nsec-start.tv_nsec)/1000000));
+        printf("\t\033[34m %s%s\033[0m -> ", file->name, file->format); 
+        if (file->target) printf("\033[34m%s:\033[0m", file->target);
+        else printf("\033[34m%s.o:\033[0m", file->name);
+        printf("\t %ld ms\n", abs((stop.tv_nsec-start.tv_nsec)/1000000));
     }
 
     return true;
@@ -200,7 +206,7 @@ bool build(bool force) {
 
     sprintf(buff+written, " -o %s%s", outdir, target);
     
-    printf("Linking:\n");
+    printf("\033[33mLinking:\033[0m\n");
     struct timespec start, stop;
     clock_gettime(CLOCK_REALTIME, &start);
     // printf("FIN LEN: %d\n", strlen(buff));
@@ -303,7 +309,7 @@ bool load_build_data() {
 
                 cpp_source = vec_add(cpp_source, &file);
 
-                // printf("%s %s %s %s %s\n", file.name, file.format, file.compiler,  file.target, file.cflags);
+                // printf("%s %s %s %s %s %s %d\n", file.name, file.format, file.compiler,  file.target, file.cflags, file.libs, file.linkable);
                 // if (file.dependencies) {
                 //     vector_metainfo dep_mt = vec_meta(file.dependencies);
                 //     for (int d=0; d < dep_mt.length; d++) {
@@ -323,7 +329,6 @@ bool load_build_data() {
 
 int main(int argc, char** argv) {
     printf("\033[36;1m C-Builder by s7k \n\033[0m");
-    printf("\033[36;1m Текст для проверки кодировки \n\033[0m");
     init_json();
     // printf("\033[36m JSON inited \n\033[0m");
     system("");
