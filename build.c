@@ -18,8 +18,10 @@ typedef struct cpp_file {
     char* name;
     char* format;
     char* cflags;
+    char* libs;
     char* target;
     char** dependencies; // vector
+    bool linkable;
 } cpp_file;
 
 
@@ -60,11 +62,16 @@ bool dir_exists(const char* path) {
     return false;
 }
 
+size_t cursor_print(char* stream, char* format, ...) {
+    sprintf(stream, format);
+    return strlen(stream);
+}
+
 bool cmd_exec(const char* command) {
-    // printf("\t\t%s\n", command);
-    // return 1;
-    int result = system(command);
-    return result==0;
+    printf("\t\t%s\n", command);
+    return 1;
+    // int result = system(command);
+    // return result==0;
 }
 
 bool makedir(const char* filename) {
@@ -100,9 +107,13 @@ void print_info_about() {
 
 bool spec_recompile(cpp_file* file) {
     char buff[128];
-    if (file->target) sprintf(buff, "%s %s %s%s%s -o %s%s", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->target);
-    else sprintf(buff, "%s %s %s%s%s -o %s%s.o", file->compiler, file->cflags, indir, file->name, file->format, outdir, file->name);
-    // printf("LEN: %d", strlen(buff));
+    size_t cursor = 0;
+    cursor += cursor_print(buff+cursor, "%s %s %s%s%s ", file->compiler, file->cflags, indir, file->name, file->format);
+    if (file->libs) cursor += cursor_print(buff+cursor, "%s ", file->libs);
+
+    if (file->target) cursor_print(buff+cursor, "-o %s%s ", outdir, file->target);
+    else cursor_print(buff+cursor, "-o %s%s.o ", outdir, file->name);
+
     return cmd_exec(buff);
 }
 
@@ -168,7 +179,7 @@ bool build(bool force) {
     if (!recompile(force)) return error("Compilation error\n");
     
     char buff[256]; *buff = '\0';
-    int written = 0;
+    size_t written = 0;
     sprintf(buff+written, "%s ", linker);
     written = strlen(buff);
     vector_metainfo meta = vec_meta(cpp_source);
@@ -176,13 +187,14 @@ bool build(bool force) {
     
     for (int i=0; i<meta.length; i++) {
         file = cpp_source + i;
+        if (!file->linkable) continue;
         if (file->target) sprintf(buff+written, "%s%s ", outdir, file->target);
         else sprintf(buff+written, "%s%s.o ", outdir, file->name);
         written = strlen(buff);
     }
 
     if (libs) {
-        sprintf(buff+written, libs);
+        sprintf(buff+written, "%s ", libs);
         written = strlen(buff);
     }
 
@@ -242,6 +254,7 @@ bool load_build_data() {
             cpp_source = new_vec(sizeof(cpp_file), mt.length);
             for (int j=0; j<mt.length; j++) {
                 cpp_file file = {0};
+                file.linkable = 1;
                 json_object inner = obj.data.array[j];
                 if (inner.type == CHILD) {
                     vector_metainfo fields_inner = vec_meta(inner.data.child.fields);
@@ -264,6 +277,10 @@ bool load_build_data() {
                             for (int d=0; d < dep_mt.length; d++) {
                                 file.dependencies = vec_add(file.dependencies, &(inobj.data.array[d].data.str));
                             }
+                        } else if (strcmp(inn_pair.key, "libs")==0) {
+                            file.libs = inobj.data.str;
+                        } else if (strcmp(inn_pair.key, "linkable")==0) {
+                            file.linkable = inobj.data.num;
                         }
                     }
                 } else if (inner.type == STR) {
@@ -279,6 +296,8 @@ bool load_build_data() {
                 if (!file.cflags) 
                     if (cflags && strlen(cflags)>0) file.cflags = cflags;
                     else file.cflags = "-c";
+                if (!file.libs)
+                    if (libs && strlen(libs)>0) file.libs = libs;
                 if (!file.compiler) file.compiler = compiler;
                 if (!file.format) file.format = format;
 
@@ -304,6 +323,7 @@ bool load_build_data() {
 
 int main(int argc, char** argv) {
     printf("\033[36;1m C-Builder by s7k \n\033[0m");
+    printf("\033[36;1m Текст для проверки кодировки \n\033[0m");
     init_json();
     // printf("\033[36m JSON inited \n\033[0m");
     system("");

@@ -13,7 +13,8 @@
             "format" : ".c",
             "dependencies" : [
                 "json.h"
-            ]
+            ],
+            "linkable" : 1
         } ,
         {
             "name" : "vector",
@@ -21,14 +22,26 @@
             "format" : ".c",
             "dependencies" : [
                 "vector.h"
-            ]
+            ],
+            "linkable" : 1
         } ,
         {
             "name" : "memmanager",
             "format" : ".c",
             "dependencies" : [
                 "memmanager.h"
-            ]
+            ],
+            "linkable" : 1
+        },
+        {
+            "name" : "json",
+            "format" : ".c",
+            "target" : "json.dll",
+            "dependencies" : [
+                "json.h"
+            ],
+            "libs" : "-lSOMELIB",
+            "linkable" : 0
         }
     ]
 }
