@@ -26,7 +26,7 @@ typedef struct cpp_file {
 
 
 json_child handler;
-char *indir, *outdir, *compiler, *linker, *format, *libs, *cflags, *target;
+char *indir, *outdir, *targetdir, *compiler, *linker, *format, *libs, *cflags, *target;
 cpp_file* cpp_source; // vectors
 
 struct stat _lasttime;
@@ -204,7 +204,7 @@ bool build(bool force) {
         written = strlen(buff);
     }
 
-    sprintf(buff+written, " -o %s%s", outdir, target);
+    sprintf(buff+written, " -o %s%s", targetdir, target);
     
     printf("\033[33mLinking:\033[0m\n");
     struct timespec start, stop;
@@ -245,6 +245,8 @@ bool load_build_data() {
             indir = obj.data.str;
         } else if (strcmp(temp.key, "outdir")==0) {
             outdir = obj.data.str;
+        } else if (strcmp(temp.key, "targetdir")==0) {
+            targetdir = obj.data.str;
         } else if (strcmp(temp.key, "compiler")==0) {
             compiler = obj.data.str;
         } else if (strcmp(temp.key, "linker")==0) {
@@ -322,7 +324,7 @@ bool load_build_data() {
         }
     }
     // printf("%s %s %s %s %s %s %s\n", indir, outdir, compiler, format, libs, cflags, target);
-    return indir && outdir && compiler && format && target && cpp_source;
+    return indir && outdir && targetdir && compiler && format && target && cpp_source;
 }
 
 
