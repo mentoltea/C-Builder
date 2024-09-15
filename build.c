@@ -218,10 +218,8 @@ bool build(bool force) {
     return result;
 }
 
-bool load_build_data() {
-    FILE* fd = fopen("build.json", "r");
+bool load_build_data(FILE* fd) {
     handler = read_json(fd);
-    fclose(fd);
     vector_metainfo meta = vec_meta(handler.fields);
     json_pair temp;
     json_object obj;
@@ -327,46 +325,93 @@ bool load_build_data() {
     return indir && outdir && targetdir && compiler && format && target && cpp_source;
 }
 
+typedef enum Todo {
+    UNKNOWN,
+    RECOMPILE,
+    BUILD
+} Todo;
 
+typedef enum FlagForce {
+    NOTFORCE = 0,
+    FORCE
+} FlagForce;
 
 int main(int argc, char** argv) {
-    printf("\033[36;1m C-Builder by s7k \n\033[0m");
-    init_json();
-    // printf("\033[36m JSON inited \n\033[0m");
     system("");
-    if (!load_build_data()) {
+    printf("\033[36;1m C-Builder by s7k \n\033[0m");
+    
+    bool result = false;
+    Todo todo;
+    FlagForce flagforce;
+    struct timespec start, stop;
+    char* filename = NULL;
+    
+    
+    if (in_vector("--help", argv, argc)) {
+        print_info_about();
+    } else if (in_vector("-fb", argv, argc) || in_vector("-bf", argv, argc) || in_vector("--force_build", argv, argc)) {
+        todo = BUILD;
+        flagforce = FORCE;
+    }
+    else if (in_vector("-fr", argv, argc) || in_vector("-rf", argv, argc) || in_vector("--force_recompile", argv, argc)) {
+        todo = RECOMPILE;
+        flagforce = FORCE;
+    }
+    else if (in_vector("-b", argv, argc) || in_vector("--build", argv, argc)) {
+        todo = BUILD;
+        flagforce = NOTFORCE;
+    }
+    else if (in_vector("-r", argv, argc) || in_vector("--recompile", argv, argc)) {
+        todo = BUILD;
+        flagforce = NOTFORCE;
+    }
+    else {
+        todo = BUILD;
+        flagforce = NOTFORCE;
+    }
+
+    for (int i=1; i<argc; i++) {
+        if (argv[i][0]!='-') {
+            filename = argv[i];
+            break;
+        }
+    }
+    if (!filename) filename = "build.json";
+
+    FILE* fd = fopen(filename, "r");
+    if (!fd) {
+        printf("\033[31;1m Cannot open file \033[0m\n");
+        goto EXIT_BUILDER;
+    }
+    init_json();
+    if (!load_build_data(fd)) {
         printf("\033[31;1m Cannot read json-file \033[0m\n");
-        return 1;
+        fclose(fd);
+        goto EXIT_BUILDER;
     }
     printf("\033[36m JSON-file succesfully read \n\033[0m");
-    bool result = true;
-    struct timespec start, stop;
+    fclose(fd);
+
+
+    clock_gettime(CLOCK_REALTIME, &start);
+    switch (todo)
+    {
+    case RECOMPILE:
+        result = recompile(flagforce);
+        break;
+
+    case BUILD:
+        result = build(flagforce);
+        break;
     
-    if (argc > 1) {
-        if (in_vector("--help", argv, argc)) {
-            print_info_about();
-        } else if (in_vector("-fb", argv, argc) || in_vector("-bf", argv, argc) || in_vector("--force_build", argv, argc)) {
-            clock_gettime(CLOCK_REALTIME, &start);
-            result = build(true);
-        }
-        else if (in_vector("-fr", argv, argc) || in_vector("-rf", argv, argc) || in_vector("--force_recompile", argv, argc)) {
-            clock_gettime(CLOCK_REALTIME, &start);
-            result = recompile(true);
-        }
-        else if (in_vector("-b", argv, argc) || in_vector("--build", argv, argc)) {
-            clock_gettime(CLOCK_REALTIME, &start);
-            result = build(false);
-        }
-        else if (in_vector("-r", argv, argc) || in_vector("--recompile", argv, argc)) {
-            clock_gettime(CLOCK_REALTIME, &start);
-            result = recompile(false);
-        }
-    } else {
-        result = build(false);
-        //print_info_about();
+    default:
+        result = 1;
+        printf("\033[31;1m Cannot understand settings \033[0m\n");
+        break;
     }
     clock_gettime(CLOCK_REALTIME, &stop);
-    
+
+EXIT_BUILDER:    
     destroy_pages();
     // printf("\033[36m Pages deallocated \n\033[0m");
 
