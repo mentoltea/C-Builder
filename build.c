@@ -181,12 +181,13 @@ bool recompile(bool force) {
     return true;
 }
 
+#define BUILD_BUFFER_SIZE 512
 bool build(bool force) {
     if (!recompile(force)) return error("Compilation error\n");
     
-    char buff[256]; *buff = '\0';
+    char buff[BUILD_BUFFER_SIZE]; *buff = '\0';
     size_t written = 0;
-    snprintf(buff+written, 256-written, "%s ", linker);
+    snprintf(buff+written, BUILD_BUFFER_SIZE-written, "%s ", linker);
     written = strlen(buff);
     vector_metainfo meta = vec_meta(cpp_source);
     cpp_file *file;
@@ -194,17 +195,17 @@ bool build(bool force) {
     for (int i=0; i<meta.length; i++) {
         file = cpp_source + i;
         if (!file->linkable) continue;
-        if (file->target) snprintf(buff+written, 256-written, "%s%s ", outdir, file->target);
-        else snprintf(buff+written, 256-written, "%s%s.o ", outdir, file->name);
+        if (file->target) snprintf(buff+written, BUILD_BUFFER_SIZE-written, "%s%s ", outdir, file->target);
+        else snprintf(buff+written, BUILD_BUFFER_SIZE-written, "%s%s.o ", outdir, file->name);
         written = strlen(buff);
     }
 
     if (libs) {
-        snprintf(buff+written, 256-written, "%s ", libs);
+        snprintf(buff+written, BUILD_BUFFER_SIZE-written, "%s ", libs);
         written = strlen(buff);
     }
 
-    snprintf(buff+written, 256-written, " -o %s%s", targetdir, target);
+    snprintf(buff+written, BUILD_BUFFER_SIZE-written, " -o %s%s", targetdir, target);
     
     printf("\033[33mLinking:\033[0m\n");
     struct timespec start, stop;
