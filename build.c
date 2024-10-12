@@ -186,7 +186,7 @@ bool build(bool force) {
     
     char buff[256]; *buff = '\0';
     size_t written = 0;
-    sprintf(buff+written, "%s ", linker);
+    snprintf(buff+written, 256-written, "%s ", linker);
     written = strlen(buff);
     vector_metainfo meta = vec_meta(cpp_source);
     cpp_file *file;
@@ -194,17 +194,17 @@ bool build(bool force) {
     for (int i=0; i<meta.length; i++) {
         file = cpp_source + i;
         if (!file->linkable) continue;
-        if (file->target) sprintf(buff+written, "%s%s ", outdir, file->target);
-        else sprintf(buff+written, "%s%s.o ", outdir, file->name);
+        if (file->target) snprintf(buff+written, 256-written, "%s%s ", outdir, file->target);
+        else snprintf(buff+written, 256-written, "%s%s.o ", outdir, file->name);
         written = strlen(buff);
     }
 
     if (libs) {
-        sprintf(buff+written, "%s ", libs);
+        snprintf(buff+written, 256-written, "%s ", libs);
         written = strlen(buff);
     }
 
-    sprintf(buff+written, " -o %s%s", targetdir, target);
+    snprintf(buff+written, 256-written, " -o %s%s", targetdir, target);
     
     printf("\033[33mLinking:\033[0m\n");
     struct timespec start, stop;
@@ -214,7 +214,9 @@ bool build(bool force) {
     if (result) {
         clock_gettime(CLOCK_REALTIME, &stop);
         printf("\t%ld ms\n", abs((stop.tv_nsec-start.tv_nsec)/1000000));
+        // printf("In build\n");
     }
+    // printf("In build2\n");
     return result;
 }
 
@@ -411,7 +413,7 @@ int main(int argc, char** argv) {
     }
     clock_gettime(CLOCK_REALTIME, &stop);
 
-EXIT_BUILDER:    
+EXIT_BUILDER:
     destroy_pages();
     // printf("\033[36m Pages deallocated \n\033[0m");
 
